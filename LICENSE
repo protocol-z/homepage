@@ -1,0 +1,27 @@
+Copyright (c) 2026 Z Protocol. All rights reserved.
+
+This repository contains a design and marketing prototype for the Z Protocol
+homepage. It is published publicly for transparency and for collaboration with
+invited reviewers.
+
+Source code (HTML, CSS, JavaScript, configuration, and documentation)
+-----------------------------------------------------------------------
+Provided as-is, with no warranty, for reference and review. You may read,
+study, and discuss the source. You may not redistribute, sublicense, or ship
+derivative works of this source as your own product without prior written
+permission from Z Protocol.
+
+Brand assets (files under assets/, including but not limited to photography,
+illustrations, 3D renders, wordmarks, and the Z logo)
+-----------------------------------------------------------------------
+All brand assets are the property of Z Protocol and are NOT licensed for
+reuse, redistribution, modification, or inclusion in third-party work.
+Requests for asset use should be directed to the Z Protocol design team.
+
+Third-party assets
+-----------------------------------------------------------------------
+This prototype references and loads additional assets hosted by third parties
+(including photography from Unsplash and the Three.js library). Those assets
+are governed by their respective licenses.
+
+Questions: contact the Z Protocol design team.

@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Z — Agent Interaction Layer (prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Instrument+Sans:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#F6F5F1;
+    --cream:#EDEAE0;
+    --ink-950:#0B0C0D;
+    --ink-800:#1E2126;
+    --ink-600:#4A4F57;
+    --ink-400:#8A8F98;
+    --ink-200:#C9CCD2;
+    --ink-100:#E4E5E8;
+    --mint-500:#3FB58A;
+    --mint-400:#5CC4A0;
+    --mint-200:#CFEBDC;
+    --mint-50:#EAF6F0;
+    --zcash-500:#F4B731;
+    --zcash-300:#FAD884;
+    --moss-400:#6E8C6A;
+    --stone-600:#7A7265;
+    --ease-settle: cubic-bezier(.16,.84,.28,1);
+    --ease-out: cubic-bezier(.22,1,.36,1);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink-950);font-family:'Instrument Sans',ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  body{min-height:100vh;overflow-x:hidden}
+
+  .display{font-family:'Space Grotesk',sans-serif;font-weight:400;letter-spacing:-.02em;line-height:1;color:var(--ink-950)}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-600)}
+
+  /* ====== Intro ====== */
+  .intro{max-width:1280px;margin:0 auto;padding:120px 48px 24px}
+  .intro__eyebrow{display:flex;gap:10px;align-items:center;color:var(--ink-600)}
+  .intro__eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--mint-500)}
+  .intro__title{margin:18px 0 0;font-size:clamp(40px, 5.4vw, 76px);max-width:22ch}
+  .intro__title em{font-style:italic;font-family:'Instrument Sans',serif;color:var(--ink-800)}
+  .intro__sub{margin-top:18px;font-size:19px;max-width:60ch;color:var(--ink-600);line-height:1.45}
+
+  /* ====== Stage ====== */
+  .stage{
+    max-width:1440px;margin:16px auto 0;padding:0 48px 80px;
+    position:relative;
+  }
+
+  /* Stage container — clean, no gradient (the green mood now lives inside the flow box) */
+  .chamber{
+    position:relative;
+    padding:48px 48px 48px;
+    isolation:isolate;
+  }
+
+  /* ====== Journey SVG wrapper ====== */
+  .journey{position:relative;z-index:3;width:100%}
+  .journey svg{display:block;width:100%;height:auto;overflow:visible}
+
+  /* Only one variant shown at a time */
+  .variant{display:none}
+  .variant.is-active{display:block}
+
+  /* ====== Stepped-variant terminal + flow container ====== */
+  #variant-stepped{position:relative;padding-top:20px}
+
+  .stepped-terminal{
+    position:absolute;top:0;left:-16px;z-index:6;
+    width:min(520px, 44%);
+    background:rgba(255,255,255,.78);
+    backdrop-filter:blur(22px) saturate(1.25);
+    -webkit-backdrop-filter:blur(22px) saturate(1.25);
+    border:1px solid rgba(11,11,13,.08);
+    border-radius:16px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.8) inset,
+      0 12px 32px rgba(11,11,13,.08),
+      0 32px 64px rgba(11,11,13,.05);
+    overflow:hidden;
+    opacity:0;transform:translateY(6px);
+    transition:opacity 600ms var(--ease-settle), transform 600ms var(--ease-settle);
+  }
+  #variant-stepped.is-stepped-terminal-ready .stepped-terminal{opacity:1;transform:translateY(0)}
+
+  .stepped-terminal__bar{
+    display:flex;align-items:center;gap:12px;
+    padding:10px 14px;
+    border-bottom:1px solid rgba(11,11,13,.06);
+    background:rgba(255,255,255,.45);
+  }
+  .stepped-terminal__dots{display:inline-flex;gap:6px}
+  .stepped-terminal__dot{
+    width:10px;height:10px;border-radius:50%;
+    background:rgba(11,11,13,.14);
+  }
+  .stepped-terminal__label{
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    letter-spacing:.2em;text-transform:uppercase;color:var(--ink-400);
+  }
+  .stepped-terminal__body{
+    padding:16px 18px 18px;
+    display:flex;align-items:flex-start;gap:10px;
+  }
+  .stepped-terminal__prefix{
+    font-family:'JetBrains Mono',monospace;font-weight:500;
+    color:var(--zcash-500);font-size:14px;line-height:1.55;
+    flex:0 0 auto;
+  }
+  .stepped-terminal__text{
+    font-family:'Space Grotesk',sans-serif;font-weight:400;
+    font-size:14.5px;line-height:1.55;color:var(--ink-950);
+    flex:1;word-break:break-word;
+  }
+  .stepped-terminal__text .hl{
+    font-weight:500;color:var(--ink-950);
+    background:linear-gradient(180deg, transparent 62%, rgba(244,183,49,.32) 62%);
+    padding:0 2px;border-radius:2px;
+  }
+  /* Caret lives at the end of typed content (not right-aligned). Rendered as ::after
+     so it follows the last character naturally and wraps with the text. */
+  .stepped-terminal__text::after{
+    content:'';
+    display:inline-block;
+    width:1.5px;height:14px;
+    background:var(--ink-950);
+    margin-left:2px;
+    vertical-align:-2px;
+    transform:translateY(1px);
+    animation:blink 1s steps(2) infinite;
+  }
+  .stepped-terminal__caret{ display:none; } /* legacy caret span retired */
+  @keyframes blink{0%,50%{opacity:1}50.01%,100%{opacity:0}}
+
+  .flow-container{
+    position:relative;margin-top:70px;
+    border:1.5px solid rgba(63,181,138,.22);
+    border-radius:20px;
+    /* Barely-there green wash — subtle enough that the card still reads as neutral. */
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 50%, rgba(207,235,220,.22), rgba(255,255,255,0) 75%),
+      rgba(255,255,255,.55);
+    padding:40px 18px 56px; /* extra bottom padding to clear the in-box legend */
+    overflow:visible;      /* allow the return-loop arc to curve out past the border */
+    opacity:0;transform:translateY(8px);
+    transition:opacity 600ms var(--ease-settle), transform 600ms var(--ease-settle);
+  }
+  .flow-container > svg{position:relative;z-index:2}
+
+  #variant-stepped.is-stepped-flow-ready .flow-container{opacity:1;transform:translateY(0)}
+
+  /* Legend — bottom-right of the flow container, no background, inline. */
+  .flow-legend{
+    position:absolute;right:24px;bottom:18px;z-index:3;
+    display:flex;gap:20px;align-items:center;
+    font-size:12px;color:var(--ink-600);
+  }
+  .flow-legend .legend__item{display:flex;gap:8px;align-items:center;white-space:nowrap}
+  .flow-legend .legend__swatch{width:10px;height:10px;border-radius:2px;flex:0 0 auto}
+  .flow-legend .legend__swatch--exec{background:var(--mint-500)}
+  .flow-legend .legend__swatch--gate{background:#fff;border:1.5px solid var(--zcash-500)}
+  .flow-legend .legend__swatch--priv{background:rgba(207,235,220,.9);border:1px solid var(--mint-200)}
+
+  /* Stepped holds its path + markers HIDDEN by default (pre-sequence).
+     They're revealed only when the JS flips on .is-stepped-drawing,
+     giving the terminal time to appear and type first. */
+  #variant-stepped .path-fg{
+    stroke-dasharray:var(--len);stroke-dashoffset:var(--len);animation:none;
+  }
+  #variant-stepped .appear{opacity:0;animation:none}
+  #variant-stepped.is-stepped-drawing .path-fg{
+    animation:draw 2400ms var(--ease-settle) 0ms forwards;
+  }
+  #variant-stepped.is-stepped-drawing .appear{
+    animation:appear 550ms var(--ease-settle) forwards;
+  }
+  @media (prefers-reduced-motion: reduce){
+    #variant-stepped .path-fg{stroke-dashoffset:0}
+    #variant-stepped .appear{opacity:1}
+    #variant-stepped .stepped-terminal,
+    #variant-stepped .flow-container{opacity:1;transform:none}
+    .stepped-terminal__text::after{animation:none}
+  }
+
+  /* Path style */
+  .path-bg{fill:none;stroke:rgba(63,181,138,.18);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .path-fg{
+    fill:none;stroke:var(--mint-500);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;
+    filter:drop-shadow(0 0 6px rgba(63,181,138,.3));
+  }
+
+  @keyframes draw{to{stroke-dashoffset:0}}
+
+  /* Nodes & gates */
+  .node-ring{fill:#fff;stroke:var(--mint-500);stroke-width:2;filter:drop-shadow(0 2px 8px rgba(63,181,138,.25))}
+  .node-core{fill:var(--mint-500)}
+  .node-label{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:15px;fill:var(--ink-950)}
+  .node-sub{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;fill:var(--ink-400);text-transform:uppercase}
+
+  .gate-tile{fill:#fff;stroke:var(--zcash-500);stroke-width:1.5;filter:drop-shadow(0 3px 10px rgba(244,183,49,.18))}
+  .gate-label{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:13px;fill:var(--ink-950);dominant-baseline:middle}
+  .gate-sub{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;fill:var(--zcash-500);text-transform:uppercase;dominant-baseline:middle}
+
+  .step-dot{fill:var(--mint-500)}
+  .step-tick{stroke:var(--mint-500);stroke-width:1.2;opacity:.55}
+  .step-label{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.18em;fill:var(--ink-600);text-transform:uppercase}
+
+  /* Staggered appearance — using opacity + filter only so we don't clobber SVG transforms */
+  @keyframes appear{to{opacity:1}}
+
+  /* Pillars caption strip below the flow */
+  .pillars-strip{
+    margin-top:24px;display:grid;grid-template-columns:repeat(4, 1fr);gap:16px;position:relative;z-index:3;
+  }
+  .pillar{
+    padding:16px 18px;border:1px solid var(--ink-100);border-radius:14px;
+    background:rgba(255,255,255,.65);backdrop-filter:blur(6px);
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .pillar__row{display:flex;align-items:center;gap:10px}
+  .pillar__glyph{
+    width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:0 0 auto;
+    background:var(--mint-50);color:var(--mint-500);
+  }
+  .pillar--autonomy .pillar__glyph{background:#FDF3DD;color:var(--zcash-500)}
+  .pillar__name{font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:15px;color:var(--ink-950)}
+  .pillar__caption{font-size:13.5px;color:var(--ink-600);line-height:1.4}
+
+  /* Outro */
+  .outro{max-width:1280px;margin:0 auto;padding:40px 48px 160px}
+  .outro__title{font-family:'Space Grotesk',sans-serif;font-weight:400;font-size:clamp(28px, 3.4vw, 44px);max-width:26ch;letter-spacing:-.02em;line-height:1.1}
+  .outro__sub{margin-top:16px;font-size:17px;color:var(--ink-600);max-width:56ch;line-height:1.5}
+
+  @media (prefers-reduced-motion: reduce){
+    #variant-stepped.is-stepped-drawing .path-fg{stroke-dashoffset:0;animation:none}
+    #variant-stepped.is-stepped-drawing .appear{opacity:1;animation:none}
+  }
+
+  /* ====== Embed mode (iframed into the homepage) ======
+     Strips the standalone intro/outro so the chamber + pillars fill the frame. */
+  body.is-embed{background:transparent}
+  body.is-embed .intro,
+  body.is-embed .outro{display:none}
+  body.is-embed .stage{margin-top:0;padding:0 24px 8px}
+  body.is-embed .chamber{padding:12px 0 0}
+
+  /* ====== Mobile breakpoints ====== */
+  @media (max-width: 820px){
+    .chamber{padding:48px 16px 32px}
+    .pillars-strip{grid-template-columns:repeat(2, 1fr);gap:12px}
+    .pillar{padding:14px 14px}
+    .pillar__name{font-size:14px}
+    .pillar__caption{font-size:12.5px}
+    .stage{padding:0 20px 60px}
+    .intro{padding:80px 24px 16px}
+    .intro__title{font-size:clamp(30px, 7vw, 48px)}
+    .intro__sub{font-size:16px}
+    .outro{padding:32px 24px 100px}
+    .flow-container{padding:28px 12px 44px}
+    .flow-legend{position:static;margin-top:12px;justify-content:flex-start;padding:0 8px;flex-wrap:wrap;gap:12px}
+    .stepped-terminal{
+      position:relative;top:auto;left:auto;
+      width:100%;margin-bottom:20px;
+    }
+  }
+  @media (max-width: 560px){
+    .chamber{padding:32px 8px 24px}
+    .pillars-strip{grid-template-columns:1fr;gap:10px}
+    body.is-embed .stage{padding:0 16px 8px}
+    .stepped-terminal__body{padding:14px 16px 16px}
+    .stepped-terminal__text{font-size:13px}
+  }
+</style>
+</head>
+<body>
+
+<section class="intro">
+  <div class="intro__eyebrow mono"><span class="dot"></span>Agent Interaction Layer</div>
+  <h2 class="display intro__title">One private chamber. <em>Every step an agent takes</em> happens inside it.</h2>
+  <p class="intro__sub">Execution and autonomy interleave as the agent moves from prompt to outcome. Z is the ground that makes this loop possible — bounded, verifiable, and invisible to anyone but you.</p>
+</section>
+
+<section class="stage">
+  <div class="chamber">
+
+    <!-- Shared icon defs -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        <symbol id="ic-key" viewBox="0 0 24 24">
+          <circle cx="9" cy="13" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M11.5 12.8 L19 12.8 M17 12.8 L17 15.4 M14.5 12.8 L14.5 15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </symbol>
+        <symbol id="ic-shield" viewBox="0 0 24 24"><path d="M12 3 L20 6 V12 C20 16.4 16.4 19.8 12 21 C7.6 19.8 4 16.4 4 12 V6 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+        <symbol id="ic-access" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/></symbol>
+        <symbol id="ic-reliability" viewBox="0 0 24 24"><path d="M4 18 L8 18 L8 12 L14 12 L14 6 L20 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+        <symbol id="ic-autonomy" viewBox="0 0 24 24"><rect x="7" y="11" width="10" height="8" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 11 V8 A3 3 0 0 1 15 8 V11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+      </defs>
+    </svg>
+
+    <!-- ====================== STEPPED VARIANT ====================== -->
+    <div class="journey variant is-active" id="variant-stepped">
+
+      <!-- Stylized terminal (Hero-consistent) carrying the initial prompt.
+           Absolutely positioned to overlap the flow container's top-left. -->
+      <div class="stepped-terminal" role="region" aria-label="Initial prompt">
+        <div class="stepped-terminal__bar">
+          <span class="stepped-terminal__dots" aria-hidden="true">
+            <span class="stepped-terminal__dot"></span>
+            <span class="stepped-terminal__dot"></span>
+            <span class="stepped-terminal__dot"></span>
+          </span>
+          <span class="stepped-terminal__label">Prompt</span>
+        </div>
+        <div class="stepped-terminal__body">
+          <span class="stepped-terminal__prefix">z://</span>
+          <span class="stepped-terminal__text" id="steppedPromptText" aria-live="polite"></span><span class="stepped-terminal__caret" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <!-- Bordered flow container (sits below + behind the terminal) -->
+      <div class="flow-container">
+      <svg viewBox="0 0 1200 440" role="img" aria-label="Agent journey from prompt to outcome, rising through three autonomy gates">
+        <!--
+          Even spacing plan:
+            Ask  x=80 , Gate1 x=340, Gate2 x=600, Gate3 x=860, Outcome x=1120
+            (4 evenly-spaced segments of 260)
+          Step dots at the midpoint of each horizontal run.
+        -->
+        <path class="path-bg" d="
+          M 80 380
+          L 320 380 Q 340 380 340 360 L 340 300 Q 340 280 360 280
+          L 580 280 Q 600 280 600 260 L 600 200 Q 600 180 620 180
+          L 840 180 Q 860 180 860 160 L 860 100 Q 860 80 880 80
+          L 1120 80
+        "/>
+        <path class="path-fg" style="--len:1800" d="
+          M 80 380
+          L 320 380 Q 340 380 340 360 L 340 300 Q 340 280 360 280
+          L 580 280 Q 600 280 600 260 L 600 200 Q 600 180 620 180
+          L 840 180 Q 860 180 860 160 L 860 100 Q 860 80 880 80
+          L 1120 80
+        "/>
+
+        <!-- Execution step markers at run midpoints: 200, 470, 730, 1000 -->
+        <g class="appear" style="animation-delay:900ms">
+          <circle class="step-dot" cx="200" cy="380" r="3"/>
+          <line class="step-tick" x1="200" y1="380" x2="200" y2="360"/>
+          <text class="step-label" x="200" y="352" text-anchor="middle">Think</text>
+        </g>
+        <g class="appear" style="animation-delay:1350ms">
+          <circle class="step-dot" cx="470" cy="280" r="3"/>
+          <line class="step-tick" x1="470" y1="280" x2="470" y2="260"/>
+          <text class="step-label" x="470" y="252" text-anchor="middle">Act</text>
+        </g>
+        <g class="appear" style="animation-delay:1800ms">
+          <circle class="step-dot" cx="730" cy="180" r="3"/>
+          <line class="step-tick" x1="730" y1="180" x2="730" y2="160"/>
+          <text class="step-label" x="730" y="152" text-anchor="middle">Deliver</text>
+        </g>
+        <g class="appear" style="animation-delay:2300ms">
+          <circle class="step-dot" cx="1000" cy="80" r="3"/>
+          <line class="step-tick" x1="1000" y1="80" x2="1000" y2="60"/>
+          <text class="step-label" x="1000" y="52" text-anchor="middle">Learn</text>
+        </g>
+
+        <!--
+          Gate anatomy (all three identical geometry, center at 0,0):
+            rect  : x=-78, y=-24, width=156, height=48, rx=14
+            icon  : translate(-64,-12), 24x24  (vertically centered)
+            label : x=18, y=-5, text-anchor="middle"   (text block centered in the space right of the icon)
+            sub   : x=18, y=10, text-anchor="middle"
+          dominant-baseline:middle on label/sub (see CSS) keeps text vertically centered at its y.
+        -->
+        <g transform="translate(340,330)">
+          <g class="appear" style="animation-delay:1100ms">
+            <rect class="gate-tile" x="-78" y="-24" width="156" height="48" rx="14"/>
+            <g transform="translate(-64,-12)" color="#F4B731"><use href="#ic-key" width="24" height="24"/></g>
+            <text class="gate-label" x="18" y="-5" text-anchor="middle">Authorize</text>
+            <text class="gate-sub" x="18" y="10" text-anchor="middle">Spend · Scope</text>
+          </g>
+        </g>
+
+        <g transform="translate(600,230)">
+          <g class="appear" style="animation-delay:1550ms">
+            <rect class="gate-tile" x="-78" y="-24" width="156" height="48" rx="14"/>
+            <g transform="translate(-64,-12)" color="#F4B731"><use href="#ic-key" width="24" height="24"/></g>
+            <text class="gate-label" x="18" y="-5" text-anchor="middle">Sign</text>
+            <text class="gate-sub" x="18" y="10" text-anchor="middle">Transaction</text>
+          </g>
+        </g>
+
+        <g transform="translate(860,130)">
+          <g class="appear" style="animation-delay:2050ms">
+            <rect class="gate-tile" x="-78" y="-24" width="156" height="48" rx="14"/>
+            <g transform="translate(-64,-12)" color="#F4B731"><use href="#ic-key" width="24" height="24"/></g>
+            <text class="gate-label" x="18" y="-5" text-anchor="middle">Verify</text>
+            <text class="gate-sub" x="18" y="10" text-anchor="middle">Receipt</text>
+          </g>
+        </g>
+
+        <!-- Bookend: Ask (bottom-left) -->
+        <g transform="translate(80,380)">
+          <g class="appear" style="animation-delay:200ms">
+            <circle class="node-ring" r="11"/>
+            <circle class="node-core" r="4"/>
+            <text class="node-label" x="0" y="36" text-anchor="middle">Ask</text>
+            <text class="node-sub" x="0" y="52" text-anchor="middle">prompt</text>
+          </g>
+        </g>
+
+        <!-- Bookend: Outcome (top-right) -->
+        <g transform="translate(1120,80)">
+          <g class="appear" style="animation-delay:2600ms">
+            <circle class="node-ring" r="11"/>
+            <circle class="node-core" r="4"/>
+            <text class="node-label" x="0" y="-20" text-anchor="middle">Outcome</text>
+            <text class="node-sub" x="0" y="-36" text-anchor="middle">next objective</text>
+          </g>
+        </g>
+
+        <!-- Return loop hint -->
+        <g class="appear" style="animation-delay:2850ms">
+          <path d="M 1120 80 Q 1200 240 1040 380 Q 560 480 80 400"
+                fill="none" stroke="rgba(63,181,138,.25)" stroke-width="1.2"
+                stroke-dasharray="3 6" stroke-linecap="round"/>
+        </g>
+      </svg>
+
+      <!-- In-chart legend — bottom-right of the flow container -->
+      <div class="flow-legend" aria-hidden="true">
+        <span class="legend__item"><span class="legend__swatch legend__swatch--exec"></span>Execution step</span>
+        <span class="legend__item"><span class="legend__swatch legend__swatch--gate"></span>Autonomy gate</span>
+        <span class="legend__item"><span class="legend__swatch legend__swatch--priv"></span>Private chamber</span>
+      </div>
+      </div><!-- /.flow-container -->
+    </div>
+  </div>
+
+  <!-- Pillars caption strip -->
+  <div class="pillars-strip">
+    <div class="pillar">
+      <div class="pillar__row">
+        <div class="pillar__glyph"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-access"/></svg></div>
+        <div class="pillar__name">Access</div>
+      </div>
+      <div class="pillar__caption">Permissionless entry. Anyone can ask, any agent can serve.</div>
+    </div>
+    <div class="pillar">
+      <div class="pillar__row">
+        <div class="pillar__glyph"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-reliability"/></svg></div>
+        <div class="pillar__name">Reliability</div>
+      </div>
+      <div class="pillar__caption">Every execution step is guided and auditable.</div>
+    </div>
+    <div class="pillar pillar--autonomy">
+      <div class="pillar__row">
+        <div class="pillar__glyph"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-autonomy"/></svg></div>
+        <div class="pillar__name">Autonomy</div>
+      </div>
+      <div class="pillar__caption">Rope is extended by you, on terms you set — not promised.</div>
+    </div>
+    <div class="pillar">
+      <div class="pillar__row">
+        <div class="pillar__glyph"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-shield"/></svg></div>
+        <div class="pillar__name">Privacy</div>
+      </div>
+      <div class="pillar__caption">The chamber itself. Inputs, work, and outputs stay shielded.</div>
+    </div>
+  </div>
+</section>
+
+<section class="outro">
+  <h3 class="display outro__title">Four pillars, one loop. The interaction layer is what makes the loop safe to run.</h3>
+  <p class="outro__sub">Execution and autonomy interleave as the agent moves from prompt to outcome — autonomy escalating on your terms, never the agent's.</p>
+</section>
+
+<script>
+  /* ---------- STEPPED sequence ----------
+     Terminal fades in → prompt types → flow container fades in → path draws.
+     The prompt is tokenized so we can highlight the "50,000 USDZ" inline while
+     still revealing character-by-character. */
+  const steppedEl = document.getElementById('variant-stepped');
+  const steppedPromptTokens = [
+    { text: 'Use this charter to build and operate the business it describes. You have ' },
+    { text: '50,000 USDZ', cls: 'hl' },
+    { text: ' and full autonomy within your permissions.' }
+  ];
+  const steppedPromptFullLength = steppedPromptTokens.reduce((n, t) => n + t.text.length, 0);
+
+  function renderSteppedPrompt(n){
+    // Render the first `n` characters across tokens, preserving highlight spans.
+    const el = document.getElementById('steppedPromptText');
+    if (!el) return;
+    let remaining = n;
+    let html = '';
+    for (const tok of steppedPromptTokens){
+      if (remaining <= 0) break;
+      const slice = tok.text.slice(0, remaining);
+      if (tok.cls){
+        html += `<span class="${tok.cls}">${slice}</span>`;
+      } else {
+        html += slice;
+      }
+      remaining -= slice.length;
+    }
+    el.innerHTML = html;
+  }
+
+  let steppedTimers = [];
+  function clearSteppedTimers(){
+    steppedTimers.forEach(clearTimeout);
+    steppedTimers = [];
+  }
+
+  function playStepped(){
+    if (!steppedEl) return;
+    clearSteppedTimers();
+
+    // Reset: hide terminal + flow container, clear prompt and drawing flag
+    steppedEl.classList.remove('is-stepped-terminal-ready','is-stepped-flow-ready','is-stepped-drawing');
+    renderSteppedPrompt(0);
+
+    // Stage 1 — terminal fades in FIRST (flow container stays hidden)
+    steppedTimers.push(setTimeout(() => {
+      steppedEl.classList.add('is-stepped-terminal-ready');
+    }, 120));
+
+    // Stage 2 — type the prompt once the terminal has landed
+    const typeStart = 780;                 // terminal fade (600ms) + small settle
+    const perChar = 11;
+    let i = 0;
+    function tick(){
+      if (i > steppedPromptFullLength) return;
+      renderSteppedPrompt(i);
+      i++;
+      if (i <= steppedPromptFullLength){
+        steppedTimers.push(setTimeout(tick, perChar + Math.random() * 16));
+      }
+    }
+    steppedTimers.push(setTimeout(tick, typeStart));
+    const typeDurationEstimate = typeStart + steppedPromptFullLength * (perChar + 8);
+
+    // Stage 3 — flow container fades in AFTER typing has fully settled
+    const flowRevealAt = typeDurationEstimate + 520;
+    steppedTimers.push(setTimeout(() => {
+      steppedEl.classList.add('is-stepped-flow-ready');
+    }, flowRevealAt));
+
+    // Stage 4 — path + markers draw once the flow container has landed
+    steppedTimers.push(setTimeout(() => {
+      steppedEl.classList.add('is-stepped-drawing');
+    }, flowRevealAt + 620));
+  }
+
+  // Embed mode (when iframed into another page with ?embed=1):
+  // strip intro/outro via CSS and post the page height upward so the
+  // parent iframe can resize to fit this content.
+  try {
+    if (new URLSearchParams(location.search).get('embed') === '1'){
+      document.body.classList.add('is-embed');
+      const postHeight = () => {
+        const h = Math.max(
+          document.documentElement.scrollHeight,
+          document.body.scrollHeight
+        );
+        try { parent.postMessage({ type: 'ail:height', h }, '*'); } catch(_){}
+      };
+      window.addEventListener('load', postHeight);
+      window.addEventListener('resize', postHeight);
+      // Re-measure after initial animations settle, and again after full sequence
+      [600, 1800, 4500, 8000].forEach(ms => setTimeout(postHeight, ms));
+    }
+  } catch(_){}
+
+  // Kick off the Stepped sequence on initial load (Stepped is the default view)
+  playStepped();
+</script>
+
+</body>
+</html>

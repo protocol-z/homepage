@@ -1,0 +1,8 @@
+# Default reviewers for the homepage prototype.
+# Any PR touching these paths will request a review from the design team.
+
+*                               @protocol-z/design
+marketing/                      @protocol-z/design
+assets/                         @protocol-z/design
+docs/                           @protocol-z/design
+.github/                        @protocol-z/design
