@@ -774,18 +774,17 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
   top: 50%;
   left: 75%;            /* default: right-side (matches panel 01 zigzag) */
   transform: translate(-50%, -50%);
-  width: min(36vh, 340px);
+  width: min(28vh, 270px);
   aspect-ratio: 665 / 929;
-  /* Between anchors the stage dims to 0 while the skin + position swap silently,
-     then fades back in at the new anchor. The `left` transition is long enough
-     to finish inside the invisible window; JS briefly disables it on swap so the
-     fade-in never reveals a horizontal slide. */
-  transition: left 650ms var(--ease-settle), opacity 420ms var(--ease-settle);
+  /* The Z slides between anchors (left transition). During the slide it also
+     dips in opacity so the movement reads as a soft dissolve-through rather
+     than a hard zigzag. */
+  transition: left 720ms var(--ease-settle), opacity 360ms var(--ease-settle);
   color: #FFFFFF;       /* all five Z treatments are white */
   pointer-events: auto; /* re-enable pointer events on the Z itself */
 }
 .z-traveler__stage.is-traveling {
-  opacity: 0;
+  opacity: 0.15;
   pointer-events: none;
 }
 .z-skin {
@@ -1043,10 +1042,10 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
    canvas never mounts and the static images remain. */
 .zfx__threejs-mount {
   /* Extend the canvas past the Z's static bounds so rotation doesn't clip.
-     ~16% extra in each direction gives comfortable room for the full
-     rotation range the user can drag to. */
+     ~6% extra in each direction is enough room for the rotation range while
+     keeping the 3D Z visually the same size as the 2D skins. */
   position: absolute;
-  inset: -16%;
+  inset: -6%;
   opacity: 0;
   transition: opacity 600ms var(--ease-settle);
   pointer-events: none;
@@ -2831,40 +2830,39 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
         const nextIdx = bestIdx;
         currentIdx = nextIdx;
 
-        // Fade out, swap silently, fade back in. Softens the anchor-to-anchor
-        // slide into a cross-dissolve while still repositioning the traveler.
-        const FADE_MS = 420;
-        stage.classList.add('is-traveling');
-        setTimeout(function () {
-          // Freeze horizontal transition so the fade-in doesn't reveal a slide
-          stage.style.transitionProperty = 'opacity';
-          stage.style.left = xPositions[nextIdx];
-          skins.forEach(function (s, i) {
-            s.classList.toggle('is-active', i === nextIdx);
-          });
-          if (statesSectionEl) {
-            statesSectionEl.setAttribute('data-active-panel', String(nextIdx));
-          }
-          // Force layout so the position snap commits before opacity restores
-          // eslint-disable-next-line no-unused-expressions
-          stage.offsetHeight;
-          stage.classList.remove('is-traveling');
-          // Restore the full transition set after the fade-in settles
-          setTimeout(function () {
-            stage.style.transitionProperty = '';
-          }, FADE_MS + 40);
+        // Soften the anchor-to-anchor journey: the `left` transition still
+        // slides the traveler across (movement preserved), and we dip opacity
+        // mid-flight so the slide reads as a gentle dissolve-through rather
+        // than a hard zigzag. Skin crossfade runs concurrently.
+        const DIP_MS   = 360;   // must match CSS opacity transition
+        const SLIDE_MS = 720;   // must match CSS left transition
 
-          // 02 Reliable Execution: replay the stroke-draw each time we land
-          // on panel 1 so it feels alive rather than pre-rendered.
-          if (nextIdx === 1) {
+        stage.classList.add('is-traveling');
+        stage.style.left = xPositions[nextIdx];
+        skins.forEach(function (s, i) {
+          s.classList.toggle('is-active', i === nextIdx);
+        });
+        if (statesSectionEl) {
+          statesSectionEl.setAttribute('data-active-panel', String(nextIdx));
+        }
+
+        // Fade back in as the Z approaches the new anchor
+        setTimeout(function () {
+          stage.classList.remove('is-traveling');
+        }, Math.max(0, SLIDE_MS - DIP_MS));
+
+        // 02 Reliable Execution: replay the stroke-draw each time we land
+        // on panel 1 so it feels alive rather than pre-rendered.
+        if (nextIdx === 1) {
+          setTimeout(function () {
             document.querySelectorAll('.zfx--exec .zfx__z--stroke rect, .zfx--exec .zfx__z--stroke path').forEach(function (el) {
               el.style.animation = 'none';
               // eslint-disable-next-line no-unused-expressions
               el.getBoundingClientRect();
               el.style.animation = '';
             });
-          }
-        }, FADE_MS);
+          }, SLIDE_MS * 0.5);
+        }
       }
     }
 
