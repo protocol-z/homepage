@@ -1071,7 +1071,9 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
   position: absolute; inset: 0;
   display: grid; place-items: center;
   overflow: visible; /* let the extended 3D canvas breathe past the box */
+  cursor: grab; /* affordance for drag-to-rotate (also applies to the PNG fallback, where hover scrubs through frames) */
 }
+.zfx--3d:active { cursor: grabbing; }
 .zfx--3d img {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
@@ -2331,7 +2333,7 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
     const shape = root.querySelector('.zfx__shape');
     const lens  = root.querySelector('.zfx__lens');
     let tx = 0, ty = 0, cx = 0, cy = 0;
-    const MAX = 28; // px — max push away
+    const MAX = 46; // px — max push away (amplified so the inverse-magnet reads even on the smaller stage)
     function onMove(e) {
       const r = root.getBoundingClientRect();
       const mx = e.clientX - r.left;
@@ -2342,8 +2344,9 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
       // invert → push away
       tx = -nx * MAX;
       ty = -ny * MAX;
-      // Lens tracks cursor when "hovering the shape" (proxy: within inner 75%)
-      const near = Math.abs(nx) < 0.42 && Math.abs(ny) < 0.42;
+      // Lens tracks cursor when "hovering the shape" — widened trigger area
+      // so moving into the Z's general vicinity already flips it to hover.
+      const near = Math.abs(nx) < 0.7 && Math.abs(ny) < 0.7;
       root.classList.toggle('is-hover', near);
       lens.style.left = mx + 'px';
       lens.style.top  = my + 'px';
@@ -2423,7 +2426,7 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 
     if (!prefersReduced) {
       const root = field.parentElement; // .zfx
-      const RADIUS = 1.6; // in cell units — how wide the hover bloom reaches
+      const RADIUS = 2.6; // in cell units — wider hover bloom so the density shift reads clearly
       const hoverOn = new Set();
       let raf = null;
       let mx = -1, my = -1;
@@ -2440,7 +2443,7 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
             if (d <= RADIUS) {
               // Probabilistic — closer = more likely to light up
               const p = 1 - (d / RADIUS);
-              if (Math.random() < p * 0.9) next.add(row * COLS + col);
+              if (Math.random() < (0.4 + p * 0.6)) next.add(row * COLS + col);
             }
           }
         }
