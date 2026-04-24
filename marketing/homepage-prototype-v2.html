@@ -980,7 +980,10 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 }
 .zfx--layers .zfx__stack {
   position: absolute; inset: 0;
-  transform: rotateX(52deg) rotateZ(-6deg);
+  /* REST: slices are stacked flat (no perspective rotation) so the Z reads as
+     a single solid glyph. HOVER rotates the stack into 3D so the layers
+     visibly separate — the "opening" delta is what sells the interaction. */
+  transform: rotateX(0deg) rotateZ(0deg);
   transform-style: preserve-3d;
   transition: transform 700ms var(--ease-out);
   will-change: transform;
@@ -988,19 +991,22 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .zfx--layers .zfx__slice {
   position: absolute; inset: 0;
   will-change: transform;
-  transition: transform 700ms var(--ease-out);
+  transition: transform 700ms var(--ease-out), opacity 500ms var(--ease-out);
   color: inherit;
 }
 .zfx--layers .zfx__slice svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 8px 14px rgba(11,12,13,0.18)); }
-.zfx--layers.is-hover .zfx__stack { transform: rotateX(44deg) rotateZ(-5deg); }
-.zfx--layers .zfx__slice:nth-child(1) { transform: translateZ(-30px); color: rgba(255,255,255,0.55); opacity: 0.75; }
-.zfx--layers .zfx__slice:nth-child(2) { transform: translateZ(-10px); color: rgba(255,255,255,0.72); opacity: 0.9; }
-.zfx--layers .zfx__slice:nth-child(3) { transform: translateZ(10px);  color: #F2C94C; opacity: 0.98; } /* yellow accent layer */
-.zfx--layers .zfx__slice:nth-child(4) { transform: translateZ(30px);  color: #FFFFFF; opacity: 1; }
-.zfx--layers.is-hover .zfx__slice:nth-child(1) { transform: translateZ(-72px); }
-.zfx--layers.is-hover .zfx__slice:nth-child(2) { transform: translateZ(-24px); }
-.zfx--layers.is-hover .zfx__slice:nth-child(3) { transform: translateZ(24px); }
-.zfx--layers.is-hover .zfx__slice:nth-child(4) { transform: translateZ(72px); }
+/* REST: all slices flat at z=0, only the top one visible, others masked behind it */
+.zfx--layers .zfx__slice:nth-child(1) { transform: translateZ(0); color: rgba(255,255,255,0.55); opacity: 0; }
+.zfx--layers .zfx__slice:nth-child(2) { transform: translateZ(0); color: rgba(255,255,255,0.72); opacity: 0; }
+.zfx--layers .zfx__slice:nth-child(3) { transform: translateZ(0); color: #F2C94C; opacity: 0; } /* yellow accent layer */
+.zfx--layers .zfx__slice:nth-child(4) { transform: translateZ(0); color: #FFFFFF; opacity: 1; }
+/* HOVER: stack tilts into perspective and slices fan out in Z, revealing the
+   yellow accent layer and the ghost layers below the surface. */
+.zfx--layers.is-hover .zfx__stack { transform: rotateX(46deg) rotateZ(-6deg); }
+.zfx--layers.is-hover .zfx__slice:nth-child(1) { transform: translateZ(-90px); opacity: 0.6; }
+.zfx--layers.is-hover .zfx__slice:nth-child(2) { transform: translateZ(-30px); opacity: 0.85; }
+.zfx--layers.is-hover .zfx__slice:nth-child(3) { transform: translateZ(30px);  opacity: 1; }
+.zfx--layers.is-hover .zfx__slice:nth-child(4) { transform: translateZ(90px);  opacity: 1; }
 
 /* --- 04 Programmable Privacy Rights: blurred tiles (flush grid) --- */
 .zfx--tiles { overflow: hidden; border-radius: 24px; cursor: cell; }
@@ -2407,9 +2413,11 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
       cells.push(t);
     }
 
-    // Pick a sparse seed set (~20% coverage) — a few scattered tiles visible at rest
-    const SEED_RATIO = 0.2;
-    const seedCount = Math.max(5, Math.round(total * SEED_RATIO));
+    // REST: extremely sparse seed set (2–3 scattered tiles). The minimal rest
+    // state is deliberate — it makes the hover bloom (dense pixel storm) read
+    // as a dramatic shift rather than a subtle density nudge.
+    const SEED_RATIO = 0.08;
+    const seedCount = Math.max(2, Math.round(total * SEED_RATIO));
     const indices = cells.map(function (_, i) { return i; });
     for (let i = indices.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -2426,10 +2434,11 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 
     if (!prefersReduced) {
       const root = field.parentElement; // .zfx
-      const RADIUS = 2.6; // in cell units — wider hover bloom so the density shift reads clearly
+      const RADIUS = 3.4; // in cell units — wide bloom so the pixel storm reads across the Z
       const hoverOn = new Set();
       let raf = null;
       let mx = -1, my = -1;
+      let entryPulse = false;
 
       function update() {
         raf = null;
@@ -2440,10 +2449,14 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
         for (let row = 0; row < ROWS; row++) {
           for (let col = 0; col < COLS; col++) {
             const d = Math.hypot(col + 0.5 - colF, row + 0.5 - rowF);
-            if (d <= RADIUS) {
-              // Probabilistic — closer = more likely to light up
-              const p = 1 - (d / RADIUS);
-              if (Math.random() < (0.4 + p * 0.6)) next.add(row * COLS + col);
+            // Entry pulse: briefly boost the radius so the first frame after
+            // mouseenter lights up the whole grid — "it woke up" feedback.
+            const effectiveR = entryPulse ? RADIUS * 2.2 : RADIUS;
+            if (d <= effectiveR) {
+              // Closer to cursor = almost guaranteed. Even far cells flicker.
+              const p = 1 - (d / effectiveR);
+              const threshold = entryPulse ? (0.4 + p * 0.6) : (0.7 + p * 0.3);
+              if (Math.random() < threshold) next.add(row * COLS + col);
             }
           }
         }
@@ -2461,6 +2474,10 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
         next.forEach(function (idx) { hoverOn.add(idx); });
       }
 
+      root.addEventListener('mouseenter', function () {
+        entryPulse = true;
+        setTimeout(function () { entryPulse = false; }, 280);
+      });
       root.addEventListener('mousemove', function (e) {
         mx = e.clientX; my = e.clientY;
         if (!raf) raf = requestAnimationFrame(update);
