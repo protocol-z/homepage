@@ -27,6 +27,31 @@ echo "→ Local HEAD  : $(git log --oneline -1)"
 echo "→ Branch      : $(git rev-parse --abbrev-ref HEAD)"
 echo
 
+push_with_recovery() {
+  # try a regular push; on a non-fast-forward rejection, attempt a
+  # safe merge of unrelated histories (covers the case where the remote
+  # was seeded with a README), then push again.
+  if git push -u origin main 2>&1; then
+    return 0
+  fi
+  echo
+  echo "→ Push rejected. Likely cause: remote has commits this local doesn't"
+  echo "  (e.g. an auto-added README from gh repo create)."
+  echo "→ Fetching remote and merging unrelated histories…"
+  git fetch origin
+  if git pull origin main --allow-unrelated-histories --no-edit; then
+    echo "→ Merge successful. Pushing again…"
+    git push -u origin main
+  else
+    echo
+    echo "✗ Merge had conflicts. Resolve them, then run:"
+    echo "    git add ."
+    echo "    git commit"
+    echo "    git push -u origin main"
+    return 1
+  fi
+}
+
 # Path A — gh CLI is installed and authenticated
 if command -v gh >/dev/null 2>&1; then
   if gh auth status >/dev/null 2>&1; then
@@ -36,7 +61,7 @@ if command -v gh >/dev/null 2>&1; then
       if ! git remote get-url origin >/dev/null 2>&1; then
         git remote add origin "https://github.com/$REPO.git"
       fi
-      git push -u origin main
+      push_with_recovery
     else
       echo "→ Creating $REPO and pushing in one step."
       gh repo create "$REPO" --source=. --push --public --description "$DESC"
