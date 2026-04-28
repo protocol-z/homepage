@@ -20,7 +20,7 @@ The homepage reads in two halves — serene typography on top, concrete product 
 2. **Five-panel Z sequence** — one sticky Z traveler, five cross-fading "skins" that each express a property of the interaction layer: *Unbiased*, *Reliable Execution*, *Verifiable Results*, *Programmable Privacy Rights*, *Self-improving* (real Three.js 3D, drag to rotate).
 3. **Agent journey (embedded)** — a stepped narrative of how an agent moves from prompt to outcome.
 4. **Shielded Pool diagram** — inputs (human, trading agents, yield agents) → single shielded pool → fan-out of private products.
-5. **Agent Utilities** — a photographic rail of Z Inference, Z Compute, Z Trade, Z Lend.
+5. **Agent Utilities** — an eight-card carousel (Z Inference, Z Compute, Z Trade, Z Lend, USDZ, Z Stake, Z Pay, Z Bridge), each with a custom monoline illustration in the v2 line vocabulary — engineering-drawing on cream, mint as active/output, yellow as in-flight signal.
 6. **Stay Informed** — email-only signup.
 7. **Footer**.
 
