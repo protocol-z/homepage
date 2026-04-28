@@ -39,7 +39,8 @@ push_with_recovery() {
   echo "  (e.g. an auto-added README from gh repo create)."
   echo "→ Fetching remote and merging unrelated histories…"
   git fetch origin
-  if git pull origin main --allow-unrelated-histories --no-edit; then
+  # --no-rebase is required on git 2.27+ when local and remote have diverged
+  if git pull origin main --allow-unrelated-histories --no-edit --no-rebase; then
     echo "→ Merge successful. Pushing again…"
     git push -u origin main
   else
